@@ -6,7 +6,7 @@ in ways, which might expose errors in programs intended to process
 the data. For more information, read the fine manual page, or visit
 https://gitlab.com/akihe/radamsa.
 
-Rusty Radamsa was written by Amanda Rousseau (malwareunicorn), based on Radams by Aki Helin, initially at OUSPG.
+Rusty Radamsa was written by Amanda Rousseau (malwareunicorn), based on Radamsa by Aki Helin, initially at OUSPG.
 
 ## Requirements:
 Supported operating systems:
