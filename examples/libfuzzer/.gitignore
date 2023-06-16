@@ -1,0 +1,25 @@
+# Binaries
+*.exe
+*.dll
+*.lib
+
+# Object files
+*.o
+*.obj
+*.out
+*.pdb
+*.ilk
+
+# CMake
+CMakeCache.txt
+CMakeFiles
+
+# IDEs
+*.sln
+*.vcxproj
+*.vcxproj.filters
+
+# Directories
+bin/
+obj/
+build/

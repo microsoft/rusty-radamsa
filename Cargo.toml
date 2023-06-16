@@ -1,0 +1,58 @@
+[package]
+name = "rusty_radamsa"
+version = "0.1.0"
+edition = "2021"
+authors = ["Amanda Rousseau <malwareunicorn@secured.org>"]
+description = "Radamsa ported to Rust."
+readme = "README.md"
+license = "MIT"
+keywords = [
+    "fuzzer",
+    "radamsa",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs"
+]
+
+categories = ["encoding"]
+
+[lib]
+name="rusty_radamsa"
+crate-type = ["cdylib", "rlib"]
+path="src/lib.rs"
+
+[[bin]]
+name="rustyradamsa"
+path="src/main.rs"
+
+
+[dependencies]
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+ethnum = "1.3.2"
+lazy_static = "1.4"
+fraction = "0.13.1"
+sha2 = "0.10.6"
+crc = "3.0.1"
+clap = { version = "4.2.1", features = ["derive"] }
+log = "0.4.17"
+env_logger = "0.10.0"
+wax = "0.4.0"
+chrono = "0.4.24"
+print_bytes = "1.2.0"
+regex = "1.7.3"
+strum = "0.24"
+strum_macros = "0.24"
+snowflake = "1.2"
+
+
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", default-features = false }
+
+[target.'cfg(windows)'.dependencies.winapi]
+version = "0.3"
+features = ["consoleapi", "processenv", "minwinbase", "minwindef", "winbase"]
