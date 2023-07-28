@@ -228,6 +228,8 @@ impl Radamsa {
                 if cs_exists {
                     if p >= crate::shared::MAX_CHECKSUM_RETRY {
                         error!("max unique reached");
+                        // Make sure to return something
+                        _out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
                         break;
                     }
                     // Try again
@@ -416,6 +418,9 @@ impl Radamsa {
     }
     pub fn resize(&mut self, _enable: bool) {
         self.outputs.resize = _enable;
+    } 
+    pub fn enable_hashmap(&mut self, _enable: bool) {
+        self.checksums.use_hashmap = _enable;
     }
 }
 
