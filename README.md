@@ -29,7 +29,7 @@ cargo build
 
 ## Usage: 
 ```text
-rusty_radamsa.exe [OPTIONS] [FILE]... [COMMAND]
+rustyradamsa.exe [OPTIONS] [FILE]... [COMMAND]
 ```
 
 ## Commands:
@@ -206,35 +206,35 @@ let _len = rusty_radamsa::radamsa(&data, data.len(), &mut out_buffer, max_len, s
 ## Command Line Examples
 List all generators, mutators, patterns, hashes, and outputs options.
 ```text
-rusty-radamsa list -a
+rustyradamsa.exe list -a
 ```
 Mutate mutiple files using the num mutator for 100 unique mutations to stdout.
 ```text
-rusty-radamsa -g file -m num -n 100 ./tests/hello*
+rustyradamsa.exe -g file -m num -n 100 ./tests/hello*
 ```
 Mutate stdin to an out put file.
 ```text
-echo "hello 12345" | rusty-radamsa -o file output.bin
+echo "hello 12345" | rustyradamsa.exe -o file output.bin
 ```
 Generate random data and pipe to a bin file.
 ```text
-rusty-radamsa -g random > some.bin
+rustyradamsa.exe -g random > some.bin
 ```
 Get data from TCP Stream using the num mutator.
 ```text
-rusty-radamsa -m num -g tcp "127.0.0.1:6666"
+rustyradamsa.exe -m num -g tcp "127.0.0.1:6666"
 ```
 Send data to TCP Stream using the random generator.
 ```text
-rusty-radamsa -g random -o tcpclient "127.0.0.1:6666"
+rustyradamsa.exe -g random -o tcpclient "127.0.0.1:6666"
 ```
 Send data to UDP server. 
 ```text
-rusty_radamsa.exe -g random -T 30 -o udpclient 127.0.0.1:8888,127.0.0.1:8000 -v
+rustyradamsa.exe -g random -T 30 -o udpclient 127.0.0.1:8888,127.0.0.1:8000 -v
 ```
 Generate from UDP input.
 ```text
-rusty_radamsa.exe -m num -g udp 0.0.0.0:8888 -v
+rustyradamsa.exe -m num -g udp 0.0.0.0:8888 -v
 ```
 
 ## TODOs:
