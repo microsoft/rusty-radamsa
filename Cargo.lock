@@ -783,6 +783,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
+ "nom",
  "print_bytes",
  "rand",
  "rand_chacha",
