@@ -119,6 +119,39 @@ fn parse_quoted_string(delim: char) -> impl FnMut(&[u8]) -> IResult<&[u8], Delim
     }
 }
 
+#[cfg(test)]
+mod quoted_string {
+    use super::parse_quoted_string;
+
+    #[test]
+    fn simple() {
+        let parse = parse_quoted_string('"')(br#""AAA""#).unwrap().1;
+        assert_eq!(parse.delimitor, 0x22);
+        assert_eq!(parse.data, b"AAA");
+    }
+
+    #[test]
+    fn nested() {
+        let parse = parse_quoted_string('"')(br#""'AAA'""#).unwrap().1;
+        assert_eq!(parse.delimitor, 0x22);
+        assert_eq!(parse.data, br#"'AAA'"#);
+    }
+
+    #[test]
+    fn escape() {
+        let parse = parse_quoted_string('"')(br#""A\'A\"A""#).unwrap().1;
+        assert_eq!(parse.delimitor, 0x22);
+        assert_eq!(parse.data, br#"A\'A\"A"#);
+    }
+
+    #[test]
+    fn empty() {
+        let parse = parse_quoted_string('"')(br#""""#).unwrap().1;
+        assert_eq!(parse.delimitor, 0x22);
+        assert_eq!(parse.data, br#""#);
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Text {
     Texty(Vec<u8>),
@@ -316,6 +349,20 @@ mod ascii_bad {
         );
         let data_unlex: Vec<u8> = cs.unlex();
         assert_eq!(data, data_unlex);
+    }
+
+    #[test]
+    fn lex_unmatched_quotes() {
+        let cs = Ascii::parse(b"A'AA\"BBBB\"CCC\"").unwrap();
+        assert_eq!(cs.0.len(), 1);
+        assert_eq!(
+            cs.0[0],
+            Data::Texty(vec![
+                Text::texty(b"A'AA"),
+                Text::Delim(Delimited::delimitor('"', b"BBBB")),
+                Text::texty(b"CCC\""),
+            ])
+        );
     }
 
     #[test]
