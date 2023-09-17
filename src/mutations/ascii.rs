@@ -37,8 +37,7 @@ fn random_badness(_rng: &mut dyn RngCore) -> Vec<u8> {
 }
 
 fn mutate_text_data(_rng: &mut dyn RngCore, data: &mut Vec<u8>) {
-    assert!(data.len() > 0);
-    let idx = _rng.gen_range(0..data.len());
+    let idx = _rng.gen_range(0..=data.len());
     match _rng.gen_range(0..=2) {
         0 => {
             // insert badness
