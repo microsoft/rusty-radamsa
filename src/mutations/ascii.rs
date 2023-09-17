@@ -76,9 +76,9 @@ fn mutate_text_data(_rng: &mut dyn RngCore, data: &mut Vec<u8>) {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Delimited {
-    pub delimitor: u8,
-    pub data: Vec<u8>,
+struct Delimited {
+    delimitor: u8,
+    data: Vec<u8>,
 }
 
 impl Delimited {
@@ -152,7 +152,7 @@ mod quoted_string {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Text {
+enum Text {
     Texty(Vec<u8>),
     Delim(Delimited),
 }
@@ -212,7 +212,7 @@ fn parse_texty<'a>(input: &'a [u8]) -> IResult<&'a [u8], Vec<Text>> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub enum Data {
+enum Data {
     Bytes(Vec<u8>),
     Texty(Vec<Text>),
 }
@@ -232,7 +232,7 @@ impl Data {
 
 fn is_texty(x: u8) -> bool {
     match x {
-        9 | 10 | 13 | 31..=125 => true,
+        9 | 10 | 13 | 32..=126 => true,
         _ => false,
     }
 }
@@ -282,6 +282,7 @@ fn parse_bytes<'a>(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<
     }
 }
 
+#[derive(Debug)]
 pub struct Ascii(Vec<Data>);
 
 impl Ascii {
