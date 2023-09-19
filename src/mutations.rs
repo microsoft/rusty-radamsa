@@ -1041,12 +1041,14 @@ mod ascii;
 
 pub fn ascii_bad(_rng: &mut dyn RngCore, _data: Option<&Vec<u8>>) -> (Option<Vec<u8>>, isize) {
     if let Some(data) = _data {
-        let mut cs = ascii::Ascii::lex(data);
-        if cs.first_block_has_text() {
-            cs.mutate(_rng);
-            return (Some(cs.unlex()), rand_delta_up(_rng));
-        } else {
-            return (Some(data.clone()), -1);
+        match ascii::Ascii::parse(data) {
+            Ok(mut cs) => {
+                cs.mutate(_rng);
+                return (Some(cs.unlex()), rand_delta_up(_rng));
+            }
+            Err(_) => {
+                return (Some(data.clone()), -1);
+            }
         }
     }
     (None, 0)
