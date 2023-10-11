@@ -418,7 +418,7 @@ impl Radamsa {
     }
     pub fn resize(&mut self, _enable: bool) {
         self.outputs.resize = _enable;
-    } 
+    }
     pub fn enable_hashmap(&mut self, _enable: bool) {
         self.checksums.use_hashmap = _enable;
     }
