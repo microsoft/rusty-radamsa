@@ -180,7 +180,9 @@ impl Radamsa {
     /// rad.set_mutators("default");
     /// rad.set_patterns("default");
     /// rad.set_output(vec!["buffer"]);
-    /// let paths = vec![".\\tests\\filestream.txt".to_string()];
+    /// let base_path = std::path::Path::new(".");
+    /// let f_path = base_path.join("tests").join("filestream.txt").to_string_lossy().to_string();
+    /// let paths = vec![f_path];
     /// let mut out_buffer = std::boxed::Box::from(vec![0u8; 2048]);
     /// let len = rad.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap_or(0);
     /// assert_eq!(len, 100)
