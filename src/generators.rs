@@ -23,6 +23,7 @@ use rand::{Rng, RngCore};
 use rand_chacha::ChaCha20Rng;
 use std::fs::File;
 use std::io::Cursor;
+use std::io::IsTerminal;
 use std::io::Read;
 use std::io::Write;
 use std::io::{self, Seek, SeekFrom};
@@ -31,7 +32,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use std::io::IsTerminal;
 
 #[cfg(not(test))]
 use log::debug;
