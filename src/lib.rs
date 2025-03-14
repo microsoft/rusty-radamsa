@@ -580,7 +580,7 @@ mod tests {
         r.count = 30;
         r.init();
         r.set_mutators("bd=3,bf,nop,num=2").expect("bad input");
-        r.set_generators("default").expect("bad input");
+        r.set_generators("buffer").expect("bad input");
         r.set_patterns("default").expect("bad input");
         let data: Box<[u8]> = Box::from("ABCDEFG 12345".as_bytes());
         let mut output = vec![0u8; 20].into_boxed_slice();

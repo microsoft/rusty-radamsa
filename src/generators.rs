@@ -900,7 +900,7 @@ mod tests {
         use rand_chacha::ChaCha20Rng;
         let mut rng = ChaCha20Rng::seed_from_u64(1675126973);
         let paths = vec![filestream_str()];
-        generators.default_generators();
+        generators.generator_nodes = string_generators("random,buffer=10000,file=1000,jump=200", &mut generators.generators);
         let mut total_len = 0;
         if let Some(gen) = generators.mux_generators(&mut rng, &Some(paths), None) {
             while let (Some(block), _last_block) = gen.next_block() {
