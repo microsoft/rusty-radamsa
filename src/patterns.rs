@@ -6,10 +6,10 @@ use crate::mutations::Mutations;
 use crate::shared::*;
 use rand::RngCore;
 use std::boxed::Box;
-use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use std::path::Path;
 use std::path::PathBuf;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 #[cfg(not(test))]
 use log::debug;

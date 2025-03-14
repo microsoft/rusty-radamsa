@@ -790,13 +790,7 @@ mod tests {
     fn test_read_byte_vector_file() {
         let mut buf = Box::from(vec![0u8; 10]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(filestream_str()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 0).ok();
         assert_eq!(n, Some(10));
     }
@@ -805,13 +799,7 @@ mod tests {
     fn test_read_byte_vector_file_eof() {
         let mut buf = Box::from(vec![0u8; MAX_BLOCK_SIZE]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(filestream_str()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 0).ok();
         assert_eq!(n, Some(3486));
     }
@@ -820,13 +808,7 @@ mod tests {
     fn test_read_byte_vector_file_eof_error() {
         let mut buf = Box::from(vec![0u8; MAX_BLOCK_SIZE]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(filestream_str()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 44).ok();
         assert_eq!(n, Some(3486));
     }
@@ -835,13 +817,7 @@ mod tests {
     fn test_read_byte_vector_large_file_eof() {
         let mut buf = Box::from(vec![0u8; 100]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let mut fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(filestream_str()),
-            None,
-        )
-        .ok();
+        let mut fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let mut _n = 0;
         loop {
             _n = match read_byte_vector(&mut fd.as_mut().unwrap(), &mut buf, 0) {
@@ -906,9 +882,7 @@ mod tests {
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
         let mut generator = Generator::new(GenType::File);
         generator.init(&mut rng);
-        generator
-            .set_fd(Some(filestream_str()), None)
-            .ok();
+        generator.set_fd(Some(filestream_str()), None).ok();
         let mut total_len = 0;
         while let (Some(ref block), _last_block) = generator.next_block() {
             total_len = total_len + block.len();
