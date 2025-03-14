@@ -6,6 +6,8 @@ use log::*;
 use rusty_radamsa;
 use std::io::Write;
 
+// a comment
+
 #[derive(Parser)]
 #[command(
     author,
