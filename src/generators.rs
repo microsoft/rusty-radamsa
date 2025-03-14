@@ -29,6 +29,7 @@ use std::io::Write;
 use std::io::{self, Seek, SeekFrom};
 use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::path::Path;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -776,6 +777,15 @@ mod tests {
     use super::*;
     use std::thread;
 
+    fn filestream() -> PathBuf {
+        let base_path = Path::new(".");
+        base_path.join("tests").join("filestream.txt")
+    }
+
+    fn filestream_str() -> String {
+        filestream().into_os_string().into_string().unwrap()
+    }
+
     #[test]
     fn test_read_byte_vector_file() {
         let mut buf = Box::from(vec![0u8; 10]);
@@ -783,7 +793,7 @@ mod tests {
         let fd = get_fd(
             &mut rng,
             &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
+            Some(filestream_str()),
             None,
         )
         .ok();
@@ -798,7 +808,7 @@ mod tests {
         let fd = get_fd(
             &mut rng,
             &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
+            Some(filestream_str()),
             None,
         )
         .ok();
@@ -813,7 +823,7 @@ mod tests {
         let fd = get_fd(
             &mut rng,
             &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
+            Some(filestream_str()),
             None,
         )
         .ok();
@@ -828,7 +838,7 @@ mod tests {
         let mut fd = get_fd(
             &mut rng,
             &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
+            Some(filestream_str()),
             None,
         )
         .ok();
@@ -890,15 +900,14 @@ mod tests {
     }
     #[test]
     fn test_next_block() {
-        let path = ".\\tests\\filestream.txt".to_string();
-        let file_len = std::fs::metadata(path).unwrap().len() as usize;
+        let file_len = std::fs::metadata(&filestream()).unwrap().len() as usize;
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
         let mut generator = Generator::new(GenType::File);
         generator.init(&mut rng);
         generator
-            .set_fd(Some(".\\tests\\filestream.txt".to_string()), None)
+            .set_fd(Some(filestream_str()), None)
             .ok();
         let mut total_len = 0;
         while let (Some(ref block), _last_block) = generator.next_block() {
@@ -908,14 +917,13 @@ mod tests {
     }
     #[test]
     fn test_generators() {
-        let path = ".\\tests\\filestream.txt".to_string();
-        let file_len = std::fs::metadata(path).unwrap().len() as usize;
+        let file_len = std::fs::metadata(&filestream()).unwrap().len() as usize;
         let mut generators = Generators::new();
         generators.init();
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
         let mut rng = ChaCha20Rng::seed_from_u64(1675126973);
-        let paths = vec![".\\tests\\filestream.txt".to_string()];
+        let paths = vec![filestream_str()];
         generators.default_generators();
         let mut total_len = 0;
         if let Some(gen) = generators.mux_generators(&mut rng, &Some(paths), None) {

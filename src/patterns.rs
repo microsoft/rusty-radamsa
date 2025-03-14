@@ -8,6 +8,8 @@ use rand::RngCore;
 use std::boxed::Box;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use std::path::Path;
+use std::path::PathBuf;
 
 #[cfg(not(test))]
 use log::debug;
@@ -261,15 +263,24 @@ mod tests {
     use rand::SeedableRng;
     use rand_chacha::ChaCha20Rng;
 
+    fn filestream() -> PathBuf {
+        let base_path = Path::new(".");
+        base_path.join("tests").join("filestream.txt")
+    }
+
+    fn filestream_str() -> String {
+        filestream().into_os_string().into_string().unwrap()
+    }
+
     /// Test stream data
     #[test]
     fn test_mutate_once() {
-        let path = ".\\tests\\filestream.txt".to_string();
-        let file_len = std::fs::metadata(path).unwrap().len() as usize;
+        //let path = ".\\tests\\filestream.txt".to_string();
+        let file_len = std::fs::metadata(&filestream()).unwrap().len() as usize;
         let mut generators = crate::generators::Generators::new();
         generators.init();
         let mut rng = ChaCha20Rng::seed_from_u64(42);
-        let paths = _vec_of_strings![".\\tests\\filestream.txt"];
+        let paths = _vec_of_strings![filestream_str()];
         generators.generator_nodes =
             crate::generators::string_generators("file=200", &mut generators.generators);
         let mut patterns = Patterns::new();
@@ -294,7 +305,7 @@ mod tests {
         let mut generators = crate::generators::Generators::new();
         generators.init();
         let mut rng = ChaCha20Rng::seed_from_u64(42);
-        let paths = _vec_of_strings![".\\tests\\filestream.txt"];
+        let paths = _vec_of_strings![filestream_str()];
         generators.generator_nodes =
             crate::generators::string_generators("file=200", &mut generators.generators);
         let mut patterns = Patterns::new();
@@ -318,7 +329,7 @@ mod tests {
         let mut generators = crate::generators::Generators::new();
         generators.init();
         let mut rng = ChaCha20Rng::seed_from_u64(1);
-        let paths = _vec_of_strings![".\\tests\\filestream.txt"];
+        let paths = _vec_of_strings![filestream_str()];
         generators.generator_nodes =
             crate::generators::string_generators("file=200", &mut generators.generators);
         let mut patterns = Patterns::new();
