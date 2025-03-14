@@ -16,7 +16,6 @@
 //! |pcapng|&cross;|Generator to generate pcapng data|
 
 use crate::shared::*;
-use crate::utils::atty;
 use log::*;
 use print_bytes::println_lossy;
 use rand::SeedableRng;
@@ -24,11 +23,13 @@ use rand::{Rng, RngCore};
 use rand_chacha::ChaCha20Rng;
 use std::fs::File;
 use std::io::Cursor;
+use std::io::IsTerminal;
 use std::io::Read;
 use std::io::Write;
 use std::io::{self, Seek, SeekFrom};
 use std::net::{TcpListener, TcpStream, UdpSocket};
 use std::path::Path;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -178,7 +179,8 @@ impl GenType {
     ) -> Result<Box<dyn GenericReader + 'static>, Box<dyn std::error::Error>> {
         match *self {
             GenType::Stdin => {
-                if atty::is(atty::Stream::Stdin) {
+                let stdin = io::stdin();
+                if stdin.is_terminal() {
                     return Err(Box::new(NoStdin));
                 }
                 if _buf.is_some() {
@@ -705,7 +707,8 @@ pub fn get_fd(
 ) -> Result<Box<dyn GenericReader + 'static>, Box<dyn std::error::Error>> {
     match *_type {
         GenType::Stdin => {
-            if atty::is(atty::Stream::Stdin) {
+            let stdin = io::stdin();
+            if stdin.is_terminal() {
                 return Err(Box::new(NoStdin));
             }
             if _buf.is_some() {
@@ -776,17 +779,20 @@ mod tests {
     use super::*;
     use std::thread;
 
+    fn filestream() -> PathBuf {
+        let base_path = Path::new(".");
+        base_path.join("tests").join("filestream.txt")
+    }
+
+    fn filestream_str() -> String {
+        filestream().into_os_string().into_string().unwrap()
+    }
+
     #[test]
     fn test_read_byte_vector_file() {
         let mut buf = Box::from(vec![0u8; 10]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 0).ok();
         assert_eq!(n, Some(10));
     }
@@ -795,13 +801,7 @@ mod tests {
     fn test_read_byte_vector_file_eof() {
         let mut buf = Box::from(vec![0u8; MAX_BLOCK_SIZE]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 0).ok();
         assert_eq!(n, Some(3486));
     }
@@ -810,13 +810,7 @@ mod tests {
     fn test_read_byte_vector_file_eof_error() {
         let mut buf = Box::from(vec![0u8; MAX_BLOCK_SIZE]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
-            None,
-        )
-        .ok();
+        let fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let n = read_byte_vector(&mut fd.unwrap(), &mut buf, 44).ok();
         assert_eq!(n, Some(3486));
     }
@@ -825,13 +819,7 @@ mod tests {
     fn test_read_byte_vector_large_file_eof() {
         let mut buf = Box::from(vec![0u8; 100]);
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
-        let mut fd = get_fd(
-            &mut rng,
-            &GenType::File,
-            Some(".\\tests\\filestream.txt".to_string()),
-            None,
-        )
-        .ok();
+        let mut fd = get_fd(&mut rng, &GenType::File, Some(filestream_str()), None).ok();
         let mut _n = 0;
         loop {
             _n = match read_byte_vector(&mut fd.as_mut().unwrap(), &mut buf, 0) {
@@ -890,16 +878,13 @@ mod tests {
     }
     #[test]
     fn test_next_block() {
-        let path = ".\\tests\\filestream.txt".to_string();
-        let file_len = std::fs::metadata(path).unwrap().len() as usize;
+        let file_len = std::fs::metadata(&filestream()).unwrap().len() as usize;
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
         let mut rng = ChaCha20Rng::seed_from_u64(1674713045);
         let mut generator = Generator::new(GenType::File);
         generator.init(&mut rng);
-        generator
-            .set_fd(Some(".\\tests\\filestream.txt".to_string()), None)
-            .ok();
+        generator.set_fd(Some(filestream_str()), None).ok();
         let mut total_len = 0;
         while let (Some(ref block), _last_block) = generator.next_block() {
             total_len = total_len + block.len();
@@ -908,15 +893,17 @@ mod tests {
     }
     #[test]
     fn test_generators() {
-        let path = ".\\tests\\filestream.txt".to_string();
-        let file_len = std::fs::metadata(path).unwrap().len() as usize;
+        let file_len = std::fs::metadata(&filestream()).unwrap().len() as usize;
         let mut generators = Generators::new();
         generators.init();
         use rand::SeedableRng;
         use rand_chacha::ChaCha20Rng;
         let mut rng = ChaCha20Rng::seed_from_u64(1675126973);
-        let paths = vec![".\\tests\\filestream.txt".to_string()];
-        generators.default_generators();
+        let paths = vec![filestream_str()];
+        generators.generator_nodes = string_generators(
+            "random,buffer=10000,file=1000,jump=200",
+            &mut generators.generators,
+        );
         let mut total_len = 0;
         if let Some(gen) = generators.mux_generators(&mut rng, &Some(paths), None) {
             while let (Some(block), _last_block) = gen.next_block() {

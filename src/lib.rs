@@ -11,7 +11,6 @@ pub mod output;
 pub mod patterns;
 pub mod shared;
 mod split;
-pub mod utils;
 
 use crate::shared::time_seed;
 use crate::shared::BadInput;
@@ -180,7 +179,9 @@ impl Radamsa {
     /// rad.set_mutators("default");
     /// rad.set_patterns("default");
     /// rad.set_output(vec!["buffer"]);
-    /// let paths = vec![".\\tests\\filestream.txt".to_string()];
+    /// let base_path = std::path::Path::new(".");
+    /// let path = base_path.join("tests").join("filestream.txt");
+    /// let paths = vec![path.into_os_string().into_string().unwrap()];
     /// let mut out_buffer = std::boxed::Box::from(vec![0u8; 2048]);
     /// let len = rad.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap_or(0);
     /// assert_eq!(len, 100)
@@ -579,7 +580,7 @@ mod tests {
         r.count = 30;
         r.init();
         r.set_mutators("bd=3,bf,nop,num=2").expect("bad input");
-        r.set_generators("default").expect("bad input");
+        r.set_generators("buffer").expect("bad input");
         r.set_patterns("default").expect("bad input");
         let data: Box<[u8]> = Box::from("ABCDEFG 12345".as_bytes());
         let mut output = vec![0u8; 20].into_boxed_slice();
