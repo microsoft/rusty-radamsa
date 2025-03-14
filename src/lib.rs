@@ -11,7 +11,6 @@ pub mod output;
 pub mod patterns;
 pub mod shared;
 mod split;
-pub mod utils;
 
 use crate::shared::time_seed;
 use crate::shared::BadInput;

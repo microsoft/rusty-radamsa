@@ -16,7 +16,6 @@
 //! |pcapng|&cross;|Generator to generate pcapng data|
 
 use crate::shared::*;
-use crate::utils::atty;
 use log::*;
 use print_bytes::println_lossy;
 use rand::SeedableRng;
@@ -32,6 +31,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
+use std::io::IsTerminal;
 
 #[cfg(not(test))]
 use log::debug;
@@ -179,7 +179,8 @@ impl GenType {
     ) -> Result<Box<dyn GenericReader + 'static>, Box<dyn std::error::Error>> {
         match *self {
             GenType::Stdin => {
-                if atty::is(atty::Stream::Stdin) {
+                let stdin = io::stdin();
+                if stdin.is_terminal() {
                     return Err(Box::new(NoStdin));
                 }
                 if _buf.is_some() {
@@ -706,7 +707,8 @@ pub fn get_fd(
 ) -> Result<Box<dyn GenericReader + 'static>, Box<dyn std::error::Error>> {
     match *_type {
         GenType::Stdin => {
-            if atty::is(atty::Stream::Stdin) {
+            let stdin = io::stdin();
+            if stdin.is_terminal() {
                 return Err(Box::new(NoStdin));
             }
             if _buf.is_some() {
