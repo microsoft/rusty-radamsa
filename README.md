@@ -144,7 +144,7 @@ rustyradamsa.exe [OPTIONS] [FILE]... [COMMAND]
 ## GENERATORS:
   **DEFAULT:** `random,buffer,file=1000,jump=200,stdin=10000`
 
-| id | comeplete | desc |
+| id | complete | desc |
 |---|---|---|
 |`stdin` |&check;| Generator to read data from stdin|
 |`file`  |&check;| Generator to read data from a file|
