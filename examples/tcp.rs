@@ -1,8 +1,8 @@
-extern crate rusty_radamsa;
-use print_bytes::println_lossy;
-use rusty_radamsa::Radamsa;
 use std::boxed::Box;
 use std::thread;
+
+use print_bytes::println_lossy;
+use rusty_radamsa::Radamsa;
 
 fn main() {
     let _t = thread::spawn(move || {
@@ -23,6 +23,6 @@ fn main() {
     r.set_output(vec!["buffer"]).expect("bad input");
     let mut out_buffer: Box<[u8]> = Box::from(vec![0u8; 2048]);
     let paths = vec!["127.0.0.1:34254".to_string()];
-    let _len = r.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap();
-    println_lossy(&out_buffer[.._len]);
+    let len = r.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap();
+    println_lossy(&out_buffer[..len]);
 }

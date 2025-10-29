@@ -677,7 +677,6 @@ dependencies = [
  "env_logger",
  "ethnum",
  "fraction",
- "lazy_static",
  "libc",
  "log",
  "nom",

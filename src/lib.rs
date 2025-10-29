@@ -1,6 +1,4 @@
 #![doc = include_str!("../README.md")]
-#[macro_use]
-extern crate lazy_static;
 
 pub mod digest;
 mod fuse;
@@ -12,28 +10,28 @@ pub mod patterns;
 pub mod shared;
 mod split;
 
-use crate::shared::time_seed;
-use crate::shared::BadInput;
+use std::boxed::Box;
+use std::ffi::CStr;
+#[cfg(test)]
+use std::println as debug;
+
+#[cfg(not(test))]
+use log::debug;
 use log::*;
 use rand::RngCore;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
-use std::boxed::Box;
-use std::ffi::CStr;
 
-#[cfg(not(test))]
-use log::debug;
-
-#[cfg(test)]
-use std::println as debug;
+use crate::shared::time_seed;
+use crate::shared::BadInput;
 
 /// Initial radamsa configs
 pub struct Radamsa {
     /// Random seed (number, default random).
     pub seed: u64,
-    /// user specified random generator, default ChaCha20Rng.
+    /// user specified random generator, default `ChaCha20Rng`.
     pub rng: Box<dyn RngCore>,
-    /// show progress during generation. Set RUST_LOG env variable.
+    /// show progress during generation. Set `RUST_LOG` env variable.
     pub verbose: bool,
     /// how many outputs to generate (number or inf).
     pub count: usize,
@@ -42,11 +40,11 @@ pub struct Radamsa {
     /// sleep for n milliseconds between outputs (TODO: implement).
     pub delay: usize,
     /// maximum number of checksums in uniqueness filter (0 disables).
-    /// hash algorithm for uniqueness checks (stream, sha1 or sha256).
+    /// hash algorithm for uniqueness checks (stream, sha1, or sha256).
     pub(crate) checksums: digest::Checksums,
-    /// Which mutations to use. default default_mutations.
+    /// Which mutations to use. default `default_mutations`.
     pub(crate) mutations: mutations::Mutations,
-    /// which patterns to use. default default_patterns.
+    /// which patterns to use. default `default_patterns`.
     pub(crate) patterns: patterns::Patterns,
     /// which data generators to use. default "random,file=1000,jump=200,stdin=100000".
     pub(crate) generators: generators::Generators,
@@ -67,23 +65,26 @@ impl std::fmt::Debug for Radamsa {
             .field("patterns", &self.patterns)
             .field("generators", &self.generators)
             .field("outputs", &self.outputs)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
+#[allow(clippy::new_without_default)]
+#[allow(clippy::should_implement_trait)]
 impl Radamsa {
     /// Constructs a new radamsa object with uninitialized contents.
-    /// The seed for rand is based on time. See [time_seed].
+    /// The seed for rand is based on time. See [`time_seed`].
     ///
     /// # Examples
     ///
     /// ```
     /// let mut rad = rusty_radamsa::Radamsa::new();
     /// ```
-    pub fn new() -> Radamsa {
+    #[must_use]
+    pub fn new() -> Self {
         let seed = time_seed();
-        Radamsa {
-            seed: seed,
+        Self {
+            seed,
             rng: Box::new(ChaCha20Rng::seed_from_u64(seed)),
             verbose: false,
             count: 0,
@@ -105,10 +106,11 @@ impl Radamsa {
     /// ```
     /// let mut rad = rusty_radamsa::Radamsa::new_with_seed(42);
     /// ```
-    pub fn new_with_seed(_seed: u64) -> Radamsa {
-        Radamsa {
-            seed: _seed,
-            rng: Box::new(ChaCha20Rng::seed_from_u64(_seed)),
+    #[must_use]
+    pub fn new_with_seed(seed: u64) -> Self {
+        Self {
+            seed,
+            rng: Box::new(ChaCha20Rng::seed_from_u64(seed)),
             verbose: false,
             count: 0,
             offset: 0,
@@ -128,15 +130,16 @@ impl Radamsa {
         self.outputs.init();
     }
 
-    /// Initializes with defaults for patterns, mutations, patterns, and outputs.
-    /// A time generated u64 value is used for the seed.
+    /// Initializes with defaults for generators, mutations, patterns, and outputs.
+    /// A time-generated u64 value is used for the seed.
     ///
     /// # Examples
     ///
     /// ```
     /// let mut rad = rusty_radamsa::Radamsa::default();
     /// ```
-    pub fn default() -> Radamsa {
+    #[must_use]
+    pub fn default() -> Self {
         let mut r = Self::new();
         r.init();
         r.generators.default_generators();
@@ -147,7 +150,7 @@ impl Radamsa {
         r
     }
 
-    /// Initializes with defaults for patterns, mutations, patterns, and outputs.
+    /// Initializes with defaults for generators, mutations, patterns, and outputs.
     /// Seed is used to initialize rand.
     ///
     /// # Examples
@@ -155,8 +158,9 @@ impl Radamsa {
     /// ```
     /// let mut rad = rusty_radamsa::Radamsa::default_with_seed(42);
     /// ```
-    pub fn default_with_seed(_seed: u64) -> Radamsa {
-        let mut r = Self::new_with_seed(_seed);
+    #[must_use]
+    pub fn default_with_seed(seed: u64) -> Self {
+        let mut r = Self::new_with_seed(seed);
         r.verbose = true;
         r.init();
         r.generators.default_generators();
@@ -186,13 +190,15 @@ impl Radamsa {
     /// let len = rad.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap_or(0);
     /// assert_eq!(len, 100)
     /// ```
+    #[allow(clippy::borrowed_box)]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn fuzz(
         &mut self,
-        _data: Option<&Box<[u8]>>,
-        _paths: Option<Vec<String>>,
-        _buffer: Option<&mut Box<[u8]>>,
+        data: Option<&Box<[u8]>>,
+        paths: Option<Vec<String>>,
+        mut buffer: Option<&mut Box<[u8]>>,
     ) -> Result<usize, Box<dyn std::error::Error>> {
-        let mut _out_len = self.outputs.truncate;
+        let mut out_len;
         debug!(
             "Available generators {:?}",
             self.generators
@@ -203,63 +209,58 @@ impl Radamsa {
         );
         let mut n = 1;
         let mut p = 0;
-        let mut buffer = match _buffer {
-            Some(b) => Some(b),
-            None => None,
-        };
         self.outputs.init_pipes(&buffer)?;
         // Initial pass
         let generator = self
             .generators
-            .mux_generators(&mut self.rng, &_paths, _data)
+            .mux_generators(&mut self.rng, &paths, data)
             .expect("Failed to choose generator, paths maybe malformed");
         let (og_data, mut mut_data) = self
             .patterns
             .mux_patterns(generator, &mut self.mutations)
             .unwrap();
 
-        if !self.checksums.use_hashmap {
-            _out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
-        } else {
+        if self.checksums.use_hashmap {
             loop {
                 let cs_exists = match self.checksums.digest_data(&mut_data) {
                     Some(cs) => self.checksums.add(cs).unwrap_or(true),
                     None => false,
                 };
                 if cs_exists {
-                    if p >= crate::shared::MAX_CHECKSUM_RETRY {
+                    if p >= shared::MAX_CHECKSUM_RETRY {
                         error!("max unique reached");
                         // Make sure to return something
-                        _out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
+                        out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
                         break;
                     }
                     // Try again
                     let generator = self
                         .generators
-                        .mux_generators(&mut self.rng, &_paths, Some(&og_data))
+                        .mux_generators(&mut self.rng, &paths, Some(&og_data))
                         .unwrap();
-                    match self.patterns.mux_patterns(generator, &mut self.mutations) {
-                        Some((_, m)) => mut_data = m,
-                        None => {}
+                    if let Some((_, m)) = self.patterns.mux_patterns(generator, &mut self.mutations)
+                    {
+                        mut_data = m;
                     }
                     p += 1;
                     debug!("in count loop");
                     continue;
+                }
+                // Successful unique value
+                out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
+                p = 0;
+                if n < 1 {
+                    break;
+                } else if n < self.count {
+                    n += 1;
                 } else {
-                    // Successful unique value
-                    _out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
-                    p = 0;
-                    if n < 1 {
-                        break;
-                    } else if n < self.count {
-                        n += 1;
-                    } else {
-                        break;
-                    }
+                    break;
                 }
             }
+        } else {
+            out_len = self.outputs.mux_output(&mut_data, &mut buffer)?;
         }
-        Ok(_out_len)
+        Ok(out_len)
     }
 
     /// Sets the generators to be used.
@@ -272,12 +273,12 @@ impl Radamsa {
     /// rad.init();
     /// rad.set_generators("file");
     /// ```
-    pub fn set_generators(&mut self, _gen: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if _gen == "default" {
+    pub fn set_generators(&mut self, generator: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if generator == "default" {
             self.generators.default_generators();
         } else {
             self.generators.generator_nodes =
-                crate::generators::string_generators(_gen, &mut self.generators.generators);
+                generators::string_generators(generator, &mut self.generators.generators);
         }
 
         if self.generators.generator_nodes.is_empty() {
@@ -297,12 +298,12 @@ impl Radamsa {
     /// rad.init();
     /// rad.set_mutators("bd=3,bf,num=2");
     /// ```
-    pub fn set_mutators(&mut self, _mut: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if _mut == "default" {
+    pub fn set_mutators(&mut self, muta: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if muta == "default" {
             self.mutations.default_mutations();
         } else {
             self.mutations.mutator_nodes =
-                crate::mutations::string_mutators(_mut, &mut self.mutations.mutators);
+                mutations::string_mutators(muta, &mut self.mutations.mutators);
         }
         if self.mutations.mutator_nodes.is_empty() {
             Err(Box::new(BadInput))
@@ -321,12 +322,12 @@ impl Radamsa {
     /// rad.init();
     /// rad.set_patterns("od");
     /// ```
-    pub fn set_patterns(&mut self, _pat: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if _pat == "default" {
+    pub fn set_patterns(&mut self, pat: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if pat == "default" {
             self.patterns.default_patterns();
         } else {
             self.patterns.pattern_nodes =
-                crate::patterns::string_patterns(_pat, &mut self.patterns.patterns);
+                patterns::string_patterns(pat, &mut self.patterns.patterns);
         }
         if self.patterns.pattern_nodes.is_empty() {
             Err(Box::new(BadInput))
@@ -346,11 +347,11 @@ impl Radamsa {
     /// rad.set_output(vec!["-"]);
     /// rad.set_output(vec!["file","tmp.bin"]);
     /// ```
-    pub fn set_output(&mut self, _out: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
-        if _out == vec!["default"] {
+    pub fn set_output(&mut self, out: Vec<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        if out == vec!["default"] {
             self.outputs.default_outputs();
         } else {
-            self.outputs.outputs = crate::output::string_outputs(_out, &mut self.outputs.outputs);
+            self.outputs.outputs = output::string_outputs(out, &mut self.outputs.outputs);
         }
         if self.outputs.outputs.is_empty() {
             Err(Box::new(BadInput))
@@ -369,14 +370,13 @@ impl Radamsa {
     /// rad.init();
     /// rad.set_checksum("sha");
     /// ```
-    pub fn set_checksum(&mut self, _chk: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if _chk != "default" {
-            if let Some(digest) = crate::digest::string_digest(_chk, &mut digest::init_digests()) {
+    pub fn set_checksum(&mut self, chk: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if chk != "default" {
+            if let Some(digest) = digest::string_digest(chk, &mut digest::init_digests()) {
                 self.checksums.checksum = digest;
                 return Ok(());
-            } else {
-                return Err(Box::new(BadInput));
             }
+            return Err(Box::new(BadInput));
         }
         Ok(())
     }
@@ -390,8 +390,8 @@ impl Radamsa {
     /// rad.init();
     /// rad.checksum_max(10000);
     /// ```
-    pub fn checksum_max(&mut self, _max: usize) {
-        self.checksums.max = _max;
+    pub const fn checksum_max(&mut self, max: usize) {
+        self.checksums.max = max;
     }
 
     /// Take only first n bytes of each output (mainly intended for UDP).
@@ -410,18 +410,18 @@ impl Radamsa {
     /// let len = rad.fuzz(None, None, Some(&mut out_buffer)).unwrap_or(0);
     /// assert_eq!(len, 10)
     /// ```
-    pub fn truncate(&mut self, _size: usize) {
-        self.outputs.truncate = _size;
+    pub const fn truncate(&mut self, size: usize) {
+        self.outputs.truncate = size;
     }
-    pub fn set_seed(&mut self, _seed: u64) {
-        self.seed = _seed;
-        self.rng = Box::new(ChaCha20Rng::seed_from_u64(_seed));
+    pub fn set_seed(&mut self, seed: u64) {
+        self.seed = seed;
+        self.rng = Box::new(ChaCha20Rng::seed_from_u64(seed));
     }
-    pub fn resize(&mut self, _enable: bool) {
-        self.outputs.resize = _enable;
+    pub const fn resize(&mut self, enable: bool) {
+        self.outputs.resize = enable;
     }
-    pub fn enable_hashmap(&mut self, _enable: bool) {
-        self.checksums.use_hashmap = _enable;
+    pub const fn enable_hashmap(&mut self, enable: bool) {
+        self.checksums.use_hashmap = enable;
     }
 }
 
@@ -439,31 +439,30 @@ impl Radamsa {
 /// # Examples
 ///
 /// ```
-/// fn main() {
-///     let data = std::boxed::Box::from("1 2 3 4 5 6 7 8 9 10 11 12\n".as_bytes());
-///     let mut out_buffer = std::boxed::Box::from(vec![0u8; 2048]);
-///     let max_len = 100;
-///     let seed: u64 = 42;
-///     let _len = rusty_radamsa::radamsa(&data, data.len(), &mut out_buffer, max_len, seed);
-///     println!("{:?}", out_buffer);
-/// }
+/// let data = std::boxed::Box::from("1 2 3 4 5 6 7 8 9 10 11 12\n".as_bytes());
+/// let mut out_buffer = std::boxed::Box::from(vec![0u8; 2048]);
+/// let max_len = 100;
+/// let seed: u64 = 42;
+/// let _len = rusty_radamsa::radamsa(&data, data.len(), &mut out_buffer, max_len, seed);
+/// println!("{:?}", out_buffer);
 /// ```
+#[allow(clippy::borrowed_box)]
 pub fn radamsa(
-    _data: &Box<[u8]>,
+    data: &Box<[u8]>,
     _len: usize,
-    _target: &mut Box<[u8]>,
-    _max: usize,
-    _seed: u64,
+    target: &mut Box<[u8]>,
+    max: usize,
+    seed: u64,
 ) -> usize {
-    let mut r = match _seed {
+    let mut r = match seed {
         0 => Radamsa::default(),
-        _ => Radamsa::default_with_seed(_seed),
+        _ => Radamsa::default_with_seed(seed),
     };
     r.set_generators("buffer").ok();
     r.set_output(vec!["buffer"]).ok();
-    r.truncate(_max);
+    r.truncate(max);
     debug!("Seed {}", r.seed);
-    r.fuzz(Some(_data), None, Some(_target)).unwrap_or(0)
+    r.fuzz(Some(data), None, Some(target)).unwrap_or(0)
 }
 
 /// This C FFI function uses the seed 42 to initialize.
@@ -483,7 +482,7 @@ pub fn radamsa(
 ///     return 0;
 /// }
 /// ```
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rusty_radamsa_init() -> *mut Radamsa {
     let mut r = Radamsa::new_with_seed(42);
     r.checksums.use_hashmap = false;
@@ -498,6 +497,20 @@ pub extern "C" fn rusty_radamsa_init() -> *mut Radamsa {
 
 /// This C FFI function is used to set the mutator string to customize mutators.
 ///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers and performs FFI operations.
+/// Callers must ensure the following invariants:
+///
+/// * `ctx` must be a valid, non-null pointer to a `Radamsa` instance that was previously
+///   created by `rusty_radamsa_init()` or another valid constructor.
+/// * `ctx` must be properly aligned and point to a fully initialized `Radamsa` struct.
+/// * `ctx` must not be accessed concurrently from other threads during this call.
+/// * `config` must be a valid, non-null pointer to a null-terminated C string (valid UTF-8).
+/// * `config` must remain valid for the duration of this function call.
+/// * The memory pointed to by `ctx` must not have been freed or deallocated.
+/// * The caller is responsible for ensuring `ctx` has exclusive access (no aliasing mutable references).
+///
 /// # Examples
 ///
 /// ```text
@@ -510,8 +523,8 @@ pub extern "C" fn rusty_radamsa_init() -> *mut Radamsa {
 ///     return 0;
 /// }
 /// ```
-#[no_mangle]
-pub extern "C" fn rusty_radamsa_set_mutator(ctx: *mut Radamsa, config: *const i8) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rusty_radamsa_set_mutator(ctx: *mut Radamsa, config: *const i8) {
     unsafe {
         let radamsa_instance = &mut *ctx;
         let c_str: &CStr = CStr::from_ptr(config);
@@ -525,6 +538,24 @@ pub extern "C" fn rusty_radamsa_set_mutator(ctx: *mut Radamsa, config: *const i8
 ///
 /// A seed is required to produce new a new rand number.
 /// The maximum size is truncating the output.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers, creates slices from raw memory, and
+/// performs FFI operations. Callers must ensure the following invariants:
+///
+/// * `ctx` must be a valid, non-null pointer to a `Radamsa` instance that was previously
+///   created by `rusty_radamsa_init()` or another valid constructor.
+/// * `ctx` must be properly aligned and point to a fully initialized `Radamsa` struct.
+/// * `ctx` must not be accessed concurrently from other threads during this call.
+/// * `data` must be a valid, non-null pointer to a readable memory region of at least `size` bytes.
+/// * `data` must remain valid and unchanged for the duration of this function call.
+/// * `out` must be a valid, non-null pointer to a writable memory region of at least `max_size` bytes.
+/// * `out` must not overlap with `data` memory region (undefined behavior if they alias).
+/// * `size` must accurately represent the number of valid bytes at `data` (must not exceed allocation).
+/// * `max_size` must accurately represent the number of writable bytes at `out` (must not exceed allocation).
+/// * The memory regions pointed to by `ctx`, `data`, and `out` must not have been freed or deallocated.
+/// * The caller is responsible for ensuring `ctx` has exclusive access during this call.
 ///
 /// # Examples
 ///
@@ -543,8 +574,8 @@ pub extern "C" fn rusty_radamsa_set_mutator(ctx: *mut Radamsa, config: *const i8
 ///    return NewSize;
 /// }
 /// ```
-#[no_mangle]
-pub extern "C" fn rusty_radamsa(
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rusty_radamsa(
     ctx: *mut Radamsa,
     data: *const u8,
     size: usize,
@@ -570,19 +601,20 @@ pub extern "C" fn rusty_radamsa(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use print_bytes::println_lossy;
+
+    use super::*;
 
     #[test]
     fn test_digests() {
-        let mut r = Radamsa::new_with_seed(1684207108);
+        let mut r = Radamsa::new_with_seed(1_684_207_108);
         debug!("seed {}", r.seed);
         r.count = 30;
         r.init();
         r.set_mutators("bd=3,bf,nop,num=2").expect("bad input");
         r.set_generators("buffer").expect("bad input");
         r.set_patterns("default").expect("bad input");
-        let data: Box<[u8]> = Box::from("ABCDEFG 12345".as_bytes());
+        let data: Box<[u8]> = Box::from(b"ABCDEFG 12345" as &[u8]);
         let mut output = vec![0u8; 20].into_boxed_slice();
         r.fuzz(Some(&data), None, Some(&mut output)).unwrap();
         let expected = vec![
@@ -594,18 +626,18 @@ mod tests {
 
     #[test]
     fn test_radamsa() {
-        let data = Box::from("ABC 1 2 3 4 5 6 7 8 9 10 11 12\n".as_bytes());
-        let _expected: Vec<u8> = vec![
+        let data = Box::from(b"ABC 1 2 3 4 5 6 7 8 9 10 11 12\n" as &[u8]);
+        let expected: Vec<u8> = vec![
             65, 66, 67, 32, 49, 32, 50, 32, 51, 32, 52, 32, 53, 32, 54, 32, 55, 32, 56, 32, 57, 32,
             49, 48, 32, 49, 49, 32, 49, 50, 57, 10,
         ];
         let mut out_buffer = Box::from(vec![0u8; 2048]);
         let max_len = 2048;
         let seed: u64 = 42;
-        println!("Seed {}", seed);
-        let _len = radamsa(&data, data.len(), &mut out_buffer, max_len, seed);
+        println!("Seed {seed}");
+        let len = radamsa(&data, data.len(), &mut out_buffer, max_len, seed);
         println_lossy(&out_buffer.to_vec());
-        assert_eq!(&out_buffer[.._len], &*_expected);
+        assert_eq!(&out_buffer[..len], &*expected);
     }
 
     #[test]
@@ -613,14 +645,14 @@ mod tests {
         use std::boxed::Box;
         use std::thread;
         let _t = thread::spawn(move || {
-            let mut fd: Box<dyn crate::generators::GenericReader> = crate::output::get_fd(
-                &crate::output::OutputType::TCPClient,
+            let mut fd: Box<dyn generators::GenericReader> = output::get_fd(
+                &output::OutputType::TCPClient,
                 Some("127.0.0.1:8000".to_string()),
                 &None,
             )
             .unwrap();
             let len = fd.gen_write(&[3u8; 20], 0);
-            debug!("wrote {:?}", len);
+            debug!("wrote {len:?}");
         });
         let mut r = Radamsa::new_with_seed(1);
         r.init();
@@ -632,12 +664,12 @@ mod tests {
         r.set_patterns("default").expect("bad input");
         r.set_output(vec!["buffer"]).expect("bad input");
         let mut out_buffer: Box<[u8]> = Box::from(vec![0u8; 2048]);
-        let paths = crate::shared::_vec_of_strings!["127.0.0.1:8000"];
-        let _len = r.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap();
-        debug!("test len {}", _len);
+        let paths = vec_of_strings!["127.0.0.1:8000"];
+        let len = r.fuzz(None, Some(paths), Some(&mut out_buffer)).unwrap();
+        debug!("test len {len}");
         println_lossy(&out_buffer.to_vec());
-        let _expected: Vec<u8> = vec![3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 78, 3, 3, 3, 3, 3, 3, 3, 3];
-        assert_eq!(&out_buffer[.._len], &*_expected);
+        let expected: Vec<u8> = vec![3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 78, 3, 3, 3, 3, 3, 3, 3, 3];
+        assert_eq!(&out_buffer[..len], &*expected);
     }
 
     #[test]
@@ -651,6 +683,6 @@ mod tests {
         rad.set_output(vec!["buffer"]).ok();
         let mut out_buffer = std::boxed::Box::from(vec![0u8; 2048]);
         let len = rad.fuzz(None, None, Some(&mut out_buffer)).unwrap_or(0);
-        assert_eq!(len, 10)
+        assert_eq!(len, 10);
     }
 }

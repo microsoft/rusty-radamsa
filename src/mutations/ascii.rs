@@ -8,53 +8,51 @@ use nom::sequence::preceded;
 use nom::{IResult, Parser};
 use rand::{seq::SliceRandom, Rng, RngCore};
 
-lazy_static! {
-    static ref SILLY_STRINGS: Vec<Vec<u8>> = {
-        // XXX: extend this because many of these strings are incredibly Linux-specific
-        // perhaps add a configurable wordlist
-        #[rustfmt::skip]
-        let ret = vec![
-            "%n", "%n", "%s", "%d", "%p", "%#x",
-            "\\00", "aaaa%d%n",
-            "`xcalc`", ";xcalc", "$(xcalc)", "!xcalc", "\"xcalc", "'xcalc",
-            "\\x00", "\\r\\n", "\\r", "\\n", "\\x0a", "\\x0d",
-            "NaN", "+inf",
-            "$PATH",
-            "$!!", "!!", "&#000;", "\\u0000",
-            "$&", "$+", "$`", "$'", "$1",
-        ];
-        ret.into_iter().map(|x| x.as_bytes().to_owned()).collect()
-    };
-}
+static SILLY_STRINGS: std::sync::LazyLock<Vec<Vec<u8>>> = std::sync::LazyLock::new(|| {
+    // TODO: extend this because many of these strings are incredibly Linux-specific
+    // perhaps add a configurable wordlist
+    #[rustfmt::skip]
+    let ret = vec![
+        "%n", "%n", "%s", "%d", "%p", "%#x",
+        "\\00", "aaaa%d%n",
+        "`xcalc`", ";xcalc", "$(xcalc)", "!xcalc", "\"xcalc", "'xcalc",
+        "\\x00", "\\r\\n", "\\r", "\\n", "\\x0a", "\\x0d",
+        "NaN", "+inf",
+        "$PATH",
+        "$!!", "!!", "&#000;", "\\u0000",
+        "$&", "$+", "$`", "$'", "$1",
+    ];
+    ret.into_iter().map(|x| x.as_bytes().to_owned()).collect()
+});
 
-fn random_badness(_rng: &mut dyn RngCore) -> Vec<u8> {
+fn random_badness(rng: &mut dyn RngCore) -> Vec<u8> {
     // concatenate between 1 and 20 random silly strings
     let mut v = Vec::new();
-    for _ in 0.._rng.gen_range(1..20) {
-        v.extend(SILLY_STRINGS.choose(_rng).unwrap());
+    for _ in 0..rng.gen_range(1..20) {
+        v.extend(SILLY_STRINGS.choose(rng).unwrap());
     }
     v
 }
 
-fn mutate_text_data(_rng: &mut dyn RngCore, data: &mut Vec<u8>) {
-    let idx = _rng.gen_range(0..=data.len());
-    match _rng.gen_range(0..=2) {
+fn mutate_text_data(rng: &mut dyn RngCore, data: &mut Vec<u8>) {
+    let idx = rng.gen_range(0..=data.len());
+    match rng.gen_range(0..=2) {
         0 => {
             // insert badness
-            let badness = random_badness(_rng);
+            let badness = random_badness(rng);
             for (i, d) in badness.into_iter().enumerate() {
                 data.insert(idx + i, d);
             }
         }
         1 => {
             // replace badness
-            let badness = random_badness(_rng);
+            let badness = random_badness(rng);
             data.truncate(idx);
             data.extend(&badness);
         }
         2 => {
             // push random number of newline characters
-            let num_as = match _rng.gen_range(0..=10) {
+            let num_as = match rng.gen_range(0..=10) {
                 0 => 127,
                 1 => 128,
                 2 => 255,
@@ -65,7 +63,7 @@ fn mutate_text_data(_rng: &mut dyn RngCore, data: &mut Vec<u8>) {
                 7 => 32768,
                 8 => 65535,
                 9 => 65536,
-                _ => _rng.gen_range(0..1024),
+                _ => rng.gen_range(0..1024),
             };
             for i in 0..num_as {
                 data.insert(idx + i, 0xa);
@@ -91,12 +89,13 @@ impl Delimited {
 
     fn unlex(self, v: &mut Vec<u8>) {
         v.push(self.delimitor);
-        v.extend(self.data.into_iter());
+        v.extend(self.data);
         v.push(self.delimitor);
     }
 }
 
 /// parse a string delimited by quotes
+#[allow(clippy::char_lit_as_u8)]
 fn parse_quoted_string(delim: char) -> impl FnMut(&[u8]) -> IResult<&[u8], Delimited> {
     move |input: &[u8]| {
         // parse until a terminating quote character, ignoring escaped quotes
@@ -133,7 +132,7 @@ mod quoted_string {
     fn nested() {
         let parse = parse_quoted_string('"')(br#""'AAA'""#).unwrap().1;
         assert_eq!(parse.delimitor, 0x22);
-        assert_eq!(parse.data, br#"'AAA'"#);
+        assert_eq!(parse.data, br"'AAA'");
     }
 
     #[test]
@@ -147,7 +146,7 @@ mod quoted_string {
     fn empty() {
         let parse = parse_quoted_string('"')(br#""""#).unwrap().1;
         assert_eq!(parse.delimitor, 0x22);
-        assert_eq!(parse.data, br#""#);
+        assert_eq!(parse.data, br"");
     }
 }
 
@@ -162,26 +161,26 @@ impl Text {
         Self::Texty(s.to_owned())
     }
 
-    fn mutate(&mut self, _rng: &mut dyn RngCore) {
+    fn mutate(&mut self, rng: &mut dyn RngCore) {
         match self {
-            Self::Texty(d) => mutate_text_data(_rng, d),
-            Self::Delim(d) => mutate_text_data(_rng, &mut d.data),
+            Self::Texty(d) => mutate_text_data(rng, d),
+            Self::Delim(d) => mutate_text_data(rng, &mut d.data),
         }
     }
 
     fn unlex(self, v: &mut Vec<u8>) {
         match self {
-            Text::Texty(a) => v.extend(a.into_iter()),
-            Text::Delim(delim) => delim.unlex(v),
+            Self::Texty(a) => v.extend(a),
+            Self::Delim(delim) => delim.unlex(v),
         }
     }
 }
 
-fn parse_texty<'a>(input: &'a [u8]) -> IResult<&'a [u8], Vec<Text>> {
+fn parse_texty(input: &[u8]) -> IResult<&[u8], Vec<Text>> {
     let fold_ascii = |mut acc: Vec<Text>, dat: Text| {
         match (acc.last_mut(), dat) {
             // coalesce contiguous texty blocks
-            (Some(Text::Texty(ref mut a)), Text::Texty(b)) => a.extend(b.into_iter()),
+            (Some(Text::Texty(a)), Text::Texty(b)) => a.extend(b),
             (_, dat) => acc.push(dat),
         }
         acc
@@ -220,24 +219,21 @@ enum Data {
 impl Data {
     fn unlex(self, v: &mut Vec<u8>) {
         match self {
-            Data::Texty(a) => {
-                for i in a.into_iter() {
+            Self::Texty(a) => {
+                for i in a {
                     i.unlex(v);
                 }
             }
-            Data::Bytes(a) => v.extend(a.into_iter()),
+            Self::Bytes(a) => v.extend(a),
         }
     }
 }
 
-fn is_texty(x: u8) -> bool {
-    match x {
-        9 | 10 | 13 | 32..=126 => true,
-        _ => false,
-    }
+const fn is_texty(x: u8) -> bool {
+    matches!(x, 9 | 10 | 13 | 32..=126)
 }
 
-fn parse_texty_bytes<'a>(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<Text>> {
+fn parse_texty_bytes(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<Text>> {
     move |input: &[u8]| {
         // returns success if more than min_texty contiguous "texty" bytes found
         let texty = verify(take_while(is_texty), |x: &[u8]| x.len() >= min_texty);
@@ -245,11 +241,11 @@ fn parse_texty_bytes<'a>(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8]
     }
 }
 
-fn parse_bytes<'a>(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<Data>> {
+fn parse_bytes(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<Data>> {
     let fold_bytes = |mut acc: Vec<Data>, dat: Data| {
         match (acc.last_mut(), dat) {
             // coalesce contiguous byte blocks
-            (Some(Data::Bytes(ref mut a)), Data::Bytes(b)) => a.extend(b.into_iter()),
+            (Some(Data::Bytes(a)), Data::Bytes(b)) => a.extend(b),
             (_, dat) => acc.push(dat),
         }
         acc
@@ -276,8 +272,8 @@ fn parse_bytes<'a>(min_texty: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], Vec<
         );
 
         // combine the mandatory first text chunk with rest of the data
-        let mut ret = vec![Data::Texty(text.to_owned())];
-        ret.extend(rest.into_iter());
+        let mut ret = vec![Data::Texty(text)];
+        ret.extend(rest);
         Ok((remaining, ret))
     }
 }
@@ -294,11 +290,11 @@ impl Ascii {
         }
     }
 
-    pub(crate) fn mutate(&mut self, _rng: &mut dyn RngCore) {
+    pub(crate) fn mutate(&mut self, rng: &mut dyn RngCore) {
         loop {
             // find a mutatable chunk, ignoring non-ascii data
-            if let Data::Texty(ref mut dat) = self.0.choose_mut(_rng).unwrap() {
-                dat.choose_mut(_rng).unwrap().mutate(_rng);
+            if let Data::Texty(dat) = self.0.choose_mut(rng).unwrap() {
+                dat.choose_mut(rng).unwrap().mutate(rng);
                 break;
             }
         }
@@ -306,7 +302,7 @@ impl Ascii {
 
     pub(crate) fn unlex(self) -> Vec<u8> {
         let mut ret = Vec::new();
-        for i in self.0.into_iter() {
+        for i in self.0 {
             i.unlex(&mut ret);
         }
         ret
@@ -315,12 +311,11 @@ impl Ascii {
 
 #[cfg(test)]
 mod ascii_bad {
-    use rand::{Rng, SeedableRng};
+    use rand::{RngCore, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
-    use crate::mutations::ascii::{Data, Delimited, Text};
-
     use super::Ascii;
+    use crate::mutations::ascii::{Data, Delimited, Text};
 
     #[test]
     fn basic() {
@@ -367,13 +362,11 @@ mod ascii_bad {
 
     #[test]
     fn lex_roundtrip_smoke_test() {
-        let mut rng = ChaCha20Rng::seed_from_u64(1683310580);
+        let mut rng = ChaCha20Rng::seed_from_u64(1_683_310_580);
         let mut data = vec![0u8; 1000];
         for _ in 0..1000 {
             // generate random buffer
-            for i in 0..1000 {
-                data[i] = rng.gen();
-            }
+            rng.fill_bytes(&mut data);
             if let Ok(cs) = Ascii::parse(&data) {
                 assert_eq!(&data, &cs.unlex());
             }

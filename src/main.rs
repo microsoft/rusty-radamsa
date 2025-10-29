@@ -1,10 +1,10 @@
+use std::io::Write;
+
 use chrono::Local;
 use clap::{Args, Parser, Subcommand};
 use env_logger::Builder;
 use log::LevelFilter;
 use log::*;
-use rusty_radamsa;
-use std::io::Write;
 
 #[derive(Parser)]
 #[command(
@@ -16,7 +16,7 @@ in ways, which might expose errors in programs intended to process
 the data. For more information, read the fine manual page, or visit
 https://gitlab.com/akihe/radamsa.
 
-Rusty Radamsa was written by Amanda Rousseau (malwareunicorn), based on Radams by Aki Helin, initially at OUSPG."
+Rusty Radamsa was written by Amanda Rousseau (malwareunicorn), based on Radamsa by Aki Helin, initially at OUSPG."
 )]
 struct Cli {
     /// random seed (u64, default random)
@@ -48,7 +48,7 @@ struct Cli {
     delay: usize,
     // TODO: metadata
     // TODO: recursive
-    /// take only first n bytes of each output (mainly intended for UDP).]
+    /// take only first n bytes of each output (mainly intended for UDP)
     /// if truncate is zero, no truncation happens.
     #[arg(short = 'T', long, default_value_t = 0)]
     truncate: usize,
@@ -73,6 +73,7 @@ enum Commands {
 }
 
 #[derive(Args, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 struct ListArgs {
     /// List all mutations, generators, patterns, hashes
     #[arg(short, long, default_value_t = false)]
@@ -101,9 +102,9 @@ fn match_lists(cmd: &Commands) {
                 println!("MUTATIONS:\n----------");
                 println!("  DEFAULT: {}", rusty_radamsa::mutations::DEFAULT_MUTATIONS);
                 let mutations = rusty_radamsa::mutations::init_mutations();
-                mutations.iter().for_each(|(_, x)| {
+                for x in mutations.values() {
                     println!("    {0: <6} {1: <10}", x.id(), x.info());
-                });
+                }
                 println!("---");
             }
             if list.generators || list.all {
@@ -113,40 +114,40 @@ fn match_lists(cmd: &Commands) {
                     rusty_radamsa::generators::DEFAULT_GENERATORS
                 );
                 let mutations = rusty_radamsa::generators::init_generators();
-                mutations.iter().for_each(|x| {
-                    println!("    {0: <6} {1: <10}", x.gen_type.id(), x.gen_type.info())
-                });
+                for x in &mutations {
+                    println!("    {0: <6} {1: <10}", x.gen_type.id(), x.gen_type.info());
+                }
                 println!("---");
             }
             if list.patterns || list.all {
                 println!("PATTERNS:\n----------");
                 println!("  DEFAULT: {}", rusty_radamsa::patterns::DEFAULT_PATTERNS);
                 let mutations = rusty_radamsa::patterns::init_patterns();
-                mutations.iter().for_each(|x| {
+                for x in &mutations {
                     println!(
                         "    {0: <6} {1: <10}",
                         x.pattern_type.id(),
                         x.pattern_type.info()
-                    )
-                });
+                    );
+                }
                 println!("---");
             }
             if list.hashes || list.all {
                 println!("HASHES:\n----------");
                 println!("  DEFAULT: sha256");
                 let mutations = rusty_radamsa::digest::init_digests();
-                mutations
-                    .iter()
-                    .for_each(|x| println!("    {0: <6} {1: <10}", x.id, x.desc));
+                for x in &mutations {
+                    println!("    {0: <6} {1: <10}", x.id, x.desc);
+                }
                 println!("---");
             }
             if list.outputs || list.all {
                 println!("OUTPUTS:\n----------");
                 println!("  DEFAULT: -");
                 let mutations = rusty_radamsa::output::init_outputs();
-                mutations
-                    .iter()
-                    .for_each(|x| println!("    {0: <10} {1: <10}", x.id, x.desc));
+                for x in &mutations {
+                    println!("    {0: <10} {1: <10}", x.id, x.desc);
+                }
                 println!("---");
             }
         }
@@ -160,10 +161,10 @@ fn main() {
         return;
     }
 
-    let mut radamsa = match cli.seed {
-        Some(s) => rusty_radamsa::Radamsa::new_with_seed(s),
-        None => rusty_radamsa::Radamsa::new(),
-    };
+    let mut radamsa = cli.seed.map_or_else(
+        rusty_radamsa::Radamsa::new,
+        rusty_radamsa::Radamsa::new_with_seed,
+    );
     radamsa.init();
     radamsa.verbose = cli.verbose;
     if cli.verbose {
@@ -210,10 +211,9 @@ fn main() {
         debug!("o is empty");
         radamsa.set_output(vec!["default"]).expect("bad input");
     }
-    let all_paths = match cli.file {
-        Some(files) => rusty_radamsa::shared::get_files(files).ok(),
-        None => None,
-    };
+    let all_paths = cli
+        .file
+        .and_then(|files| rusty_radamsa::shared::get_files(files).ok());
 
     radamsa.checksum_max(cli.checksums);
     radamsa.delay = cli.delay;
